@@ -49,10 +49,14 @@ import したファイルは historical reference として扱う。現在の us
 
 ## Script
 
-repository root から実行する推奨 command:
+この Plugin では bridge scripts は plugin root の `scripts/context_bridge/` に bundled されている。
+この `SKILL.md` からは `../../scripts/context_bridge/import_context.py` として解決できる。
+
+実行時は、Codex がこの `SKILL.md` の location から plugin root を解決し、absolute path にして実行する。
+command 例:
 
 ```bash
-python3 plugins/tkn-codex-context-engineering/scripts/context_bridge/import_context.py \
+python3 <plugin-root>/scripts/context_bridge/import_context.py \
   --source ~/.codex-context \
   --dest .codex-context/global-context \
   --include working-context,decisions,candidates \
@@ -62,7 +66,7 @@ python3 plugins/tkn-codex-context-engineering/scripts/context_bridge/import_cont
 Write mode:
 
 ```bash
-python3 plugins/tkn-codex-context-engineering/scripts/context_bridge/import_context.py \
+python3 <plugin-root>/scripts/context_bridge/import_context.py \
   --source ~/.codex-context \
   --dest .codex-context/global-context \
   --include working-context,decisions,candidates \

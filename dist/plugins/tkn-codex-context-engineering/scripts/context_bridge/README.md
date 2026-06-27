@@ -61,14 +61,14 @@ If `~/.codex-context` already exists as a real WSL directory, move its contents 
 Initialize the global store:
 
 ```bash
-python3 plugins/tkn-codex-context-engineering/scripts/context_bridge/context_bridge.py init --target ~/.codex-context --dry-run
-python3 plugins/tkn-codex-context-engineering/scripts/context_bridge/context_bridge.py init --target ~/.codex-context --write
+python3 <plugin-root>/scripts/context_bridge/context_bridge.py init --target ~/.codex-context --dry-run
+python3 <plugin-root>/scripts/context_bridge/context_bridge.py init --target ~/.codex-context --write
 ```
 
 Import global context into this repository:
 
 ```bash
-python3 plugins/tkn-codex-context-engineering/scripts/context_bridge/import_context.py \
+python3 <plugin-root>/scripts/context_bridge/import_context.py \
   --source ~/.codex-context \
   --dest .codex-context/global-context \
   --include working-context,decisions,candidates \
@@ -78,7 +78,7 @@ python3 plugins/tkn-codex-context-engineering/scripts/context_bridge/import_cont
 Promote a candidate or decision to the global store:
 
 ```bash
-python3 plugins/tkn-codex-context-engineering/scripts/context_bridge/promote_context.py \
+python3 <plugin-root>/scripts/context_bridge/promote_context.py \
   --target ~/.codex-context \
   --kind candidate \
   --title "example title" \

@@ -1,0 +1,20 @@
+{
+  "name": "tkn-codex-context-engineering",
+  "interface": {
+    "displayName": "TKN Codex Context Engineering"
+  },
+  "plugins": [
+    {
+      "name": "tkn-codex-context-engineering",
+      "source": {
+        "source": "local",
+        "path": "./dist/plugins/tkn-codex-context-engineering"
+      },
+      "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

@@ -15,7 +15,7 @@ description: repo-local .codex-context の session、decision、working context 
 
 この directory は context store であり、Codex configuration ではない。ユーザーが Codex configuration の編集を明示的に依頼しない限り、generated context を `~/.codex` に書き込まない。
 
-この repository では `~/.codex-context` への bridge script は `plugins/tkn-codex-context-engineering/scripts/context_bridge/` に bundled されている。当面 `.agents/skills` の個別 Skill が primary path でも、script の実体は plugin 側を使う。
+この Plugin では `~/.codex-context` への bridge scripts は plugin root の `scripts/context_bridge/` に bundled されている。この `SKILL.md` からは `../../scripts/context_bridge/promote_context.py` として解決できる。
 
 ## When to use
 
@@ -223,7 +223,7 @@ session note:
 Candidate example:
 
 ```bash
-python3 plugins/tkn-codex-context-engineering/scripts/context_bridge/promote_context.py \
+python3 <plugin-root>/scripts/context_bridge/promote_context.py \
   --target ~/.codex-context \
   --kind candidate \
   --title "context loop import promote skills" \
@@ -236,7 +236,7 @@ python3 plugins/tkn-codex-context-engineering/scripts/context_bridge/promote_con
 Decision example:
 
 ```bash
-python3 plugins/tkn-codex-context-engineering/scripts/context_bridge/promote_context.py \
+python3 <plugin-root>/scripts/context_bridge/promote_context.py \
   --target ~/.codex-context \
   --kind decision \
   --title "use explicit skill bridge for global context" \
@@ -249,7 +249,7 @@ python3 plugins/tkn-codex-context-engineering/scripts/context_bridge/promote_con
 Working context append example:
 
 ```bash
-python3 plugins/tkn-codex-context-engineering/scripts/context_bridge/promote_context.py \
+python3 <plugin-root>/scripts/context_bridge/promote_context.py \
   --target ~/.codex-context \
   --kind working-context \
   --title "Current global Codex context policy" \

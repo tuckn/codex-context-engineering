@@ -5,6 +5,8 @@
   "author": {
     "name": "Tuckn"
   },
+  "homepage": "https://github.com/tuckn/codex-context-engineering",
+  "repository": "https://github.com/tuckn/codex-context-engineering",
   "license": "UNLICENSED",
   "keywords": [
     "codex",
@@ -27,7 +29,6 @@
     "defaultPrompt": [
       "Resume an existing session note",
       "Update the repository working context",
-      "Import global Codex context into this repository",
       "Promote this session's reusable learning globally"
     ],
     "brandColor": "#2563EB",
