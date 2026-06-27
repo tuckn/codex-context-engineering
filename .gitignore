@@ -1,0 +1,6 @@
+.local/
+.codex-context/
+__pycache__/
+*.py[cod]
+.DS_Store
+scripts/sync_skills/targets.json

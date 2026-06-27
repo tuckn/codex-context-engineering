@@ -1,0 +1,81 @@
+---
+name: resume-session
+description: 新しい chat で既存の .codex-context/sessions session note を継続対象として指定し、その chat では新規 session note を作成せず指定 session note を更新する。resume、continue、継続、再開、引き継ぎ、session path/name 指定で使う。
+---
+
+# Resume Session
+
+新しい chat で既存 session note の続きを行うために、この skill を使う。
+
+目的は、作業状態を別 session note に分散させず、指定された `.codex-context/sessions/*.md` をこの chat の canonical session note として継続更新することだ。
+
+## Command shape
+
+ユーザーは次のように指定できる。
+
+```text
+$resume-session .codex-context/sessions/YYYYMMDDTHHMMSS+0900-task.md
+$resume-session YYYYMMDDTHHMMSS+0900-task
+$resume-session YYYYMMDDTHHMMSS+0900-task.md
+$resume-session
+```
+
+自然文で「この session を継続」「この session note の続き」「最新の session を再開」などと依頼された場合も、この skill を使う。
+
+## Session resolution
+
+1. ユーザーが path を指定した場合、その file だけを読む。
+2. ユーザーが filename または basename を指定した場合、`.codex-context/sessions/` 直下の filename として解決する。
+3. `.md` が省略されている場合、`.md` を補って解決する。
+4. ユーザーが session file を指定しなかった場合、`.codex-context/sessions/*.md` のうち Frontmatter `updated` が最も新しい session note を選ぶ。
+5. `updated` がない、Frontmatter が壊れている、または日時 parse ができない file は、fallback として filesystem mtime を使って並べる。
+6. 最新候補が複数あり一意に決められない場合だけ、候補を短く示してユーザーに確認する。
+7. 解決のためだけに session note の本文を全探索しない。未指定時に読むのは Frontmatter と file metadata だけにする。
+
+`.codex-context/sessions/` 全体を理解目的で読まない。読むのは指定 session note と、必要な場合の `.codex-context/working-context.md`、および指定 session note から明示的に参照された relevant files だけにする。
+
+## Resume workflow
+
+1. repository `AGENTS.md` と必須の repository specs を確認する。
+2. 指定 session note を解決して読む。
+3. session note の Frontmatter を確認する。
+   - `type: session` であること。
+   - `sessionId` が filename 先頭と対応すること。
+   - `status`、`distillationStatus`、`distilledTo` があること。
+4. この chat の canonical session note path を、指定 session note として扱う。
+5. 以後この chat では、新しい session note を作成しない。
+6. `maintain-session-note` が必要な更新は、必ず指定 session note に書く。
+7. 作業再開時点で、Frontmatter の `status` を `in-progress` にする。ただし user が閲覧のみを依頼している場合は変更しない。
+8. Skill が session note を更新したら、Frontmatter の `updated` を OS/system clock の timestamp に更新する。
+9. 再開した事実、現在の user intent、次の一手を既存 section に短く反映する。
+10. 重要な current truth が変わる場合だけ、`.codex-context/working-context.md` も更新する。
+
+## What to update in the session note
+
+必要な section だけ更新する。
+
+- `User intent / interaction summary`: 新しい chat で resume 指定があったことと、追加依頼。
+- `Current state`: resume 後の現在状態。
+- `Working context`: 新たに確認した files や assumptions。
+- `Changed files`: resume 後に変更した files。
+- `Important decisions`: resume 後に増えた durable decisions。
+- `Open issues`: 未解決の blocker や questions。
+- `Next steps`: resume 後の concrete next actions。
+- `Exact next step`: 次の chat または compaction 後に最初に取る action。
+- `Validation`: resume 後に実施した checks。
+
+chronological log は増やしすぎない。resume の事実は、後続作業に必要な範囲で短く書く。
+
+## Relationship to maintain-session-note
+
+この skill は `maintain-session-note` の代替ではない。対象 session note を固定するための entry skill である。
+
+resume 後に非自明な作業、file changes、handoff、completion が発生した場合は、`maintain-session-note` の記録基準に従う。ただし output path は新規 session note ではなく、resume した指定 session note にする。
+
+## Safety
+
+- 指定 session note を上書きする前に、現在の内容と Frontmatter を確認する。
+- secrets、credentials、tokens、private keys、full environment variables、large logs、不要な personal/customer data を追記しない。
+- unrelated session notes を変更しない。
+- user が明示しない限り、`distillationStatus`、`distilledTo`、`promotionStatus`、`promotedTo` は resume だけでは変更しない。
+- status が `done` の session を resume する場合、作業を実際に継続するなら `in-progress` に戻してよい。完了後は `done` に戻す。
