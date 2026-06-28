@@ -1,0 +1,39 @@
+{
+  "name": "tkn-codex-context-engineering",
+  "version": "0.1.0",
+  "description": "Preserve, resume, and recover Codex working context, session notes, decisions, local session history, and user-global context across chats and repositories.",
+  "author": {
+    "name": "Tuckn"
+  },
+  "homepage": "https://github.com/tuckn/tkn-codex-plugins/tree/main/plugins/tkn-codex-context-engineering",
+  "repository": "https://github.com/tuckn/tkn-codex-plugins",
+  "license": "UNLICENSED",
+  "keywords": [
+    "codex",
+    "context",
+    "session-logs",
+    "session-notes",
+    "decisions",
+    "skills"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "TKN Codex Context Engineering",
+    "shortDescription": "Maintain and resume working context, session notes, decisions, and global Codex context",
+    "longDescription": "A Codex plugin that groups context engineering skills and scripts for repository working context, session notes, session resume, decision records, decision review, local Codex session-log extraction, and explicit import or promotion of user-global context through ~/.codex-context.",
+    "developerName": "Tuckn",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Resume an existing session note",
+      "Extract and summarize a topic from local Codex session logs",
+      "Update the repository working context",
+      "Promote this session's reusable learning globally"
+    ],
+    "brandColor": "#2563EB",
+    "screenshots": []
+  }
+}

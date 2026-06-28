@@ -1,14 +1,14 @@
 {
-  "name": "tkn-codex-context-engineering",
+  "name": "tkn-codex-plugins",
   "interface": {
-    "displayName": "TKN Codex Context Engineering"
+    "displayName": "Tuckn Codex Plugins"
   },
   "plugins": [
     {
       "name": "tkn-codex-context-engineering",
       "source": {
         "source": "local",
-        "path": "./dist/plugins/tkn-codex-context-engineering"
+        "path": "./plugins/tkn-codex-context-engineering"
       },
       "policy": {
         "installation": "INSTALLED_BY_DEFAULT",

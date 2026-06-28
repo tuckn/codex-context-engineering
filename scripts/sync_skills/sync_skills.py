@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sync codex-context-engineering Skills to target repositories."""
+"""Sync Codex Context Engineering Skills to target repositories."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from typing import Any
 
 
 DEFAULT_SKILLS = [
+    "extract-codex-sessions",
     "import-global-context",
     "maintain-session-note",
     "maintain-working-context",
@@ -71,7 +72,11 @@ def copy_skill(source: Path, destination: Path, dry_run: bool) -> None:
 
 def sync(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).absolute() if args.repo_root else repo_root_from_script()
-    source_skills_root = repo_root / ".agents" / "skills"
+    source_skills_root = (
+        Path(args.skills_root).absolute()
+        if args.skills_root
+        else repo_root / "plugins" / "tkn-codex-context-engineering" / "skills"
+    )
     manifest_path = Path(args.manifest).resolve()
     manifest = load_manifest(manifest_path)
     targets = resolve_targets(manifest, args.target)
@@ -100,7 +105,7 @@ def sync(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Sync .agents/skills from this repository to target repositories."
+        description="Sync plugin-bundled skills from this repository to target repositories."
     )
     parser.add_argument(
         "--manifest",
@@ -121,6 +126,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--repo-root",
         help="Repository root override. Defaults to this script's repository root.",
+    )
+    parser.add_argument(
+        "--skills-root",
+        help=(
+            "Source skills root override. Defaults to "
+            "plugins/tkn-codex-context-engineering/skills under the repository root."
+        ),
     )
     parser.add_argument(
         "--dry-run",

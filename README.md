@@ -1,32 +1,49 @@
-# codex-context-engineering
+# tkn-codex-plugins
 
-Codex context engineering skills and support scripts for carrying useful working context across chats and repositories.
+Tuckn's public Codex plugin marketplace.
 
-## Contents
-
-- `.agents/plugins/marketplace.json`: Codex plugin marketplace manifest for GitHub-based installation.
-- `dist/plugins/tkn-codex-context-engineering/`: Codex plugin bundle containing the managed Skills and support scripts.
-- `.agents/skills/`: Source Skills used directly from this repository and available for legacy copy-based distribution.
-- `.agents/skills/import-global-context/scripts/`: Python scripts for importing user-global `~/.codex-context` into repo-local `.codex-context/global-context/`.
-- `.agents/skills/promote-global-context/scripts/`: Python scripts for promoting repo-local context into user-global `~/.codex-context`.
-- `scripts/sync_skills/`: Legacy Skill copy distribution script and target manifest.
-
-## Install As A Codex Plugin
+## Install
 
 Add this repository as a Codex plugin marketplace:
 
 ```sh
-codex plugin marketplace add tuckn/codex-context-engineering --ref main
+codex plugin marketplace add tuckn/tkn-codex-plugins --ref main
 ```
 
-The marketplace installs `tkn-codex-context-engineering` from:
+Codex reads the marketplace manifest from:
 
 ```text
-dist/plugins/tkn-codex-context-engineering/
+.agents/plugins/marketplace.json
 ```
 
-The plugin includes these Skills:
+## Marketplace Layout
 
+- `.agents/plugins/marketplace.json`: marketplace catalog for this repository.
+- `plugins/`: publishable Codex plugin bundles.
+- `scripts/sync_skills/`: legacy Skill copy-distribution tooling sourced from plugin bundles.
+
+This repository stores finished plugin bundles. Development source trees should live in separate
+repositories and publish completed bundles into `plugins/<plugin-name>/`.
+
+## Plugins
+
+### TKN Codex Context Engineering
+
+Path:
+
+```text
+plugins/tkn-codex-context-engineering/
+```
+
+Plugin manifest:
+
+```text
+plugins/tkn-codex-context-engineering/.codex-plugin/plugin.json
+```
+
+Included Skills:
+
+- `extract-codex-sessions`
 - `import-global-context`
 - `maintain-session-note`
 - `maintain-working-context`
@@ -36,55 +53,52 @@ The plugin includes these Skills:
 - `resume-session`
 - `review-decisions`
 
-## Initial Distribution Targets
+The plugin preserves and resumes Codex working context through repository working context,
+session notes, decision records, local Codex session-log extraction, and explicit import or
+promotion of user-global context through `~/.codex-context`.
 
-The distribution manifest uses Windows paths as canonical paths.
+## Adding Plugins
 
-- `C:\Users\ExampleUser\workspaces\coding\Microsoft\PowerShell`
-- `C:\Users\ExampleUser\workspaces\coding\Python\example-project`
-- `C:\Users\ExampleUser\workspaces\writing\notes`
-- `C:\Users\ExampleUser\workspaces\developing\example-platform`
+Add each new plugin under:
 
-## Current Policy
+```text
+plugins/<plugin-name>/
+```
 
-- The source of truth for Skills is `.agents/skills/`.
-- The public plugin bundle is `dist/plugins/tkn-codex-context-engineering/`.
-- The GitHub marketplace manifest is `.agents/plugins/marketplace.json`.
-- Existing `plugins/tkn-codex-context-engineering/skills/` copies from the Notes Vault are intentionally not migrated.
-- Distribution may overwrite target repository Skills without backup or mandatory confirmation.
-- A dry-run option should exist in distribution tooling, but running dry-run before every update is not mandatory.
-- Current preferred distribution is Codex plugin marketplace installation from GitHub.
-- Copy-based `.agents/skills/<SKILL>` distribution remains available for environments where plugins are unavailable.
-- Migration traceability was distilled into this README for the public plugin repository.
+Each plugin must include:
 
-## Migration Summary
+```text
+plugins/<plugin-name>/.codex-plugin/plugin.json
+```
 
-This repository was separated from the Notes Vault as the dedicated source repository for Codex context engineering work.
+Then add a matching entry to:
 
-User-confirmed starting points:
+```text
+.agents/plugins/marketplace.json
+```
 
-- Repository name: `codex-context-engineering`.
-- GitHub repository was prepared privately before public release.
-- Git history from the Notes Vault plugin folder is not preserved; this repository starts from the current file state.
-- Local path: `C:\Users\ExampleUser\workspaces\coding\repositories\codex-context-engineering`.
-- Distribution manifests use Windows paths as canonical paths.
-- Distribution scripts are Python.
-- Distribution may overwrite target Skills without backup, mandatory confirmation, or mandatory diff display.
-- Target repositories may hand-edit their local Skill copies, but source updates can overwrite them.
+Use repo-relative marketplace paths such as:
 
-Migration outcomes:
+```json
+{
+  "name": "plugin-name",
+  "source": {
+    "source": "local",
+    "path": "./plugins/plugin-name"
+  },
+  "policy": {
+    "installation": "AVAILABLE",
+    "authentication": "ON_INSTALL"
+  },
+  "category": "Productivity"
+}
+```
 
-- Eight managed context engineering Skills are currently kept under `.agents/skills/`.
-- Legacy plugin Skill copies from `plugins/tkn-codex-context-engineering/skills/` were treated as discardable duplicates.
-- Context bridge scripts were moved into the relevant Skill-local `scripts/` folders.
-- Plugin metadata is packaged as `dist/plugins/tkn-codex-context-engineering/.codex-plugin/plugin.json`.
-- `organize-brain-dump` has been intentionally promoted into this repository as a reusable context Skill.
-- Other Vault-specific Skills and sessions stay in the Notes Vault unless intentionally promoted later.
-- Detailed migration traceability was distilled before public release; this repository keeps the concise public summary.
+## Legacy Skill Sync
 
-## Sync Skills
-
-`scripts/sync_skills/sync_skills.py` copies the managed Skills from this repository's `.agents/skills/` directory into one or more target repositories.
+The preferred distribution path is the Codex plugin marketplace. For environments where plugins
+are unavailable, `scripts/sync_skills/sync_skills.py` can still copy
+`plugins/tkn-codex-context-engineering/skills/` into target repositories.
 
 Create your local target manifest from the sample:
 
@@ -92,7 +106,9 @@ Create your local target manifest from the sample:
 Copy-Item scripts\sync_skills\targets_sample.json scripts\sync_skills\targets.json
 ```
 
-Edit `scripts/sync_skills/targets.json` for your machine. This file is intentionally ignored by Git because it contains local absolute paths. Windows paths are canonical; when the script runs outside Windows, drive paths such as `C:\example\repo` are converted to `/mnt/c/example/repo`.
+Edit `scripts/sync_skills/targets.json` for your machine. This file is intentionally ignored by
+Git because it contains local absolute paths. Windows paths are canonical; when the script runs
+outside Windows, drive paths such as `C:\example\repo` are converted to `/mnt/c/example/repo`.
 
 Manifest shape:
 
@@ -108,34 +124,11 @@ Manifest shape:
 }
 ```
 
-Arguments:
-
-- `--manifest`: JSON manifest path. Defaults to `scripts/sync_skills/targets.json`.
-- `--target`: target name from the manifest, or `all`. Defaults to `all`.
-- `--skill`: one managed Skill to sync. Repeat to sync multiple Skills. Defaults to all managed Skills.
-- `--repo-root`: source repository root override. Usually not needed.
-- `--dry-run`: print planned copy operations without writing files.
-
-Dry-run all targets:
+Common commands:
 
 ```sh
 python3 scripts/sync_skills/sync_skills.py --dry-run
-```
-
-Sync one target:
-
-```sh
 python3 scripts/sync_skills/sync_skills.py --target notes
-```
-
-Sync one Skill to one target:
-
-```sh
 python3 scripts/sync_skills/sync_skills.py --target notes --skill maintain-session-note
-```
-
-Use a non-default manifest:
-
-```sh
 python3 scripts/sync_skills/sync_skills.py --manifest scripts/sync_skills/targets_sample.json --dry-run
 ```
