@@ -1,11 +1,11 @@
 ---
 name: distill-session-context
-description: Distill a repo-local Codex session note into a short review candidate for reusable context. Use when the user asks to distill, summarize, extract reusable learning, turn a session note into context, prepare context candidates, review pending distillationStatus, or create decision/working-context/Skill/AGENTS candidates from `.codex-context/sessions`.
+description: Distill a repo-local Codex session note into a short review candidate for reusable context and finalize the source session's distillation metadata after review. Use when the user asks to distill, summarize, extract reusable learning, turn a session note into context, prepare context candidates, review or close pending distillationStatus, update distilledTo, or create decision/working-context/Skill/AGENTS candidates from `.codex-context/sessions`.
 ---
 
 # Distill Session Context
 
-Use this skill to turn one session note into a reviewable context candidate.
+Use this skill to turn one session note into a reviewable context candidate, then close the source session metadata after the reviewed learning has an accepted destination.
 
 Default to candidate generation. Do not mark the source session as distilled, update working context, create decision records, promote global context, or edit AGENTS.md/Skills unless the user explicitly asks for that follow-up.
 
@@ -18,6 +18,7 @@ Default to candidate generation. Do not mark the source session as distilled, up
 3. Run a dry-run distillation to confirm the output path and extracted sections.
 4. Use `--write` only when a durable candidate file is useful.
 5. Review the generated candidate before promoting anything.
+6. After accepted content exists somewhere durable, finalize the source session metadata.
 
 ## Commands
 
@@ -56,6 +57,39 @@ Supported `--kind` values:
 - `skill-candidate`
 - `agents-candidate`
 
+## Finalization Commands
+
+Finalize after reusable context was accepted into a durable destination:
+
+```bash
+python <plugin-root>/scripts/context_bridge/finalize_session_distillation.py \
+  --session .codex-context/sessions/<session-note>.md \
+  --status distilled \
+  --distilled-to .codex-context/decisions/DR-0001-example.md \
+  --write
+```
+
+Use `partial` when only some useful content was accepted:
+
+```bash
+python <plugin-root>/scripts/context_bridge/finalize_session_distillation.py \
+  --session .codex-context/sessions/<session-note>.md \
+  --status partial \
+  --distilled-to .local/codex-context/distilled-session-candidates/<candidate>.md \
+  --write
+```
+
+Use `no-action` when review found nothing worth carrying forward:
+
+```bash
+python <plugin-root>/scripts/context_bridge/finalize_session_distillation.py \
+  --session .codex-context/sessions/<session-note>.md \
+  --status no-action \
+  --write
+```
+
+Finalization updates only source Frontmatter fields: `distillationStatus`, `distilledTo`, and `updated`.
+
 ## Promotion Boundary
 
 The generated file is only a review candidate. Promotion is a separate step.
@@ -64,10 +98,12 @@ The generated file is only a review candidate. Promotion is a separate step.
 - Use `maintain-working-context` for accepted repository current truth.
 - Use `promote-global-context` for explicit global writes.
 - Update AGENTS.md or Skills only after checking current repository behavior and public/private path safety.
+- Use finalization only after the accepted destination exists or after review decides `no-action`.
 
 ## Safety
 
 - Treat session notes as raw or silver context, not current truth.
 - Do not copy full chat transcripts or full session notes into candidates.
 - Do not distill a session note that contains secrets, credentials, tokens, private keys, full env vars, large logs, or unnecessary personal/customer data.
+- Do not put private absolute paths in `--distilled-to`; use repo-relative paths, `.local/...`, `.codex-context/...`, or `~/.codex-context/...`.
 - Keep candidate output in `.local/` unless the user explicitly requests a repository artifact.

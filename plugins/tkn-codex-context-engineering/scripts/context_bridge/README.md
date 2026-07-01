@@ -109,6 +109,19 @@ python3 <plugin-root>/scripts/context_bridge/distill_session_context.py \
 Use `--write` to save a candidate under
 `.local/codex-context/distilled-session-candidates/`.
 
+Finalize a reviewed session distillation:
+
+```bash
+python3 <plugin-root>/scripts/context_bridge/finalize_session_distillation.py \
+  --session .codex-context/sessions/<session-note>.md \
+  --status distilled \
+  --distilled-to .codex-context/decisions/DR-0001-example.md \
+  --dry-run
+```
+
+Use `--write` only after the accepted destination exists, or use
+`--status no-action` when review found nothing to carry forward.
+
 Create a local snapshot of global context:
 
 ```bash

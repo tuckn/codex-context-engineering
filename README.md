@@ -58,8 +58,8 @@ Included Skills:
 
 The plugin preserves and resumes Codex working context through repository project registration,
 working context, session notes, decision records, local Codex session-log extraction, read-only
-global context loading, freshness audit, session distillation candidates, and explicit snapshot
-import or promotion through `~/.codex-context`.
+global context loading, freshness audit, session distillation candidates and finalization, and
+explicit snapshot import or promotion through `~/.codex-context`.
 
 ## Adding Plugins
 

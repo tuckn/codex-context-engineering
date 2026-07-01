@@ -239,6 +239,112 @@ def parse_simple_frontmatter(text: str) -> dict[str, str]:
     return metadata
 
 
+def split_frontmatter_lines(text: str) -> tuple[list[str], str]:
+    lines = text.splitlines(keepends=True)
+    if not lines or lines[0].strip() != "---":
+        raise SystemExit("Source file must have YAML frontmatter.")
+    for index, line in enumerate(lines[1:], 1):
+        if line.strip() == "---":
+            return lines[: index + 1], "".join(lines[index + 1 :])
+    raise SystemExit("Source file has an opening frontmatter delimiter but no closing delimiter.")
+
+
+def strip_yaml_quotes(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def frontmatter_key_block(lines: list[str], key: str) -> tuple[int, int] | None:
+    pattern = re.compile(rf"^{re.escape(key)}:\s*(.*)$")
+    for index in range(1, len(lines) - 1):
+        if pattern.match(lines[index].rstrip("\r\n")):
+            end = index + 1
+            while end < len(lines) - 1:
+                candidate = lines[end]
+                if candidate.startswith((" ", "\t")) or candidate.strip() == "":
+                    end += 1
+                    continue
+                break
+            return index, end
+    return None
+
+
+def frontmatter_list_value(lines: list[str], key: str) -> list[str]:
+    block = frontmatter_key_block(lines, key)
+    if not block:
+        return []
+    start, end = block
+    match = re.match(rf"^{re.escape(key)}:\s*(.*)$", lines[start].rstrip("\r\n"))
+    if not match:
+        return []
+    inline = match.group(1).strip()
+    if inline == "[]":
+        return []
+    if inline:
+        return [strip_yaml_quotes(inline)]
+    values: list[str] = []
+    for line in lines[start + 1 : end]:
+        item = re.match(r"^\s*-\s*(.*?)\s*$", line.rstrip("\r\n"))
+        if item:
+            values.append(strip_yaml_quotes(item.group(1)))
+    return values
+
+
+def replace_frontmatter_scalar(lines: list[str], key: str, value: str) -> list[str]:
+    replacement = [f"{key}: {yaml_string(value)}\n"]
+    block = frontmatter_key_block(lines, key)
+    if block:
+        start, end = block
+        return lines[:start] + replacement + lines[end:]
+    return lines[:-1] + replacement + lines[-1:]
+
+
+def replace_frontmatter_list(lines: list[str], key: str, values: list[str]) -> list[str]:
+    if values:
+        replacement = [f"{key}:\n", *[f"  - {yaml_string(value)}\n" for value in values]]
+    else:
+        replacement = [f"{key}: []\n"]
+    block = frontmatter_key_block(lines, key)
+    if block:
+        start, end = block
+        return lines[:start] + replacement + lines[end:]
+    return lines[:-1] + replacement + lines[-1:]
+
+
+def normalized_context_ref(value: str) -> str:
+    return value.strip().replace("\\", "/")
+
+
+def validate_distilled_to_ref(value: str) -> str:
+    ref = normalized_context_ref(value)
+    if not ref:
+        raise SystemExit("distilledTo path cannot be empty.")
+    if re.match(r"^[A-Za-z]:/", ref):
+        raise SystemExit(f"Refusing Windows absolute distilledTo path: {value}")
+    if ref.startswith("//"):
+        raise SystemExit(f"Refusing UNC distilledTo path: {value}")
+    if ref.startswith("/"):
+        raise SystemExit(f"Refusing absolute distilledTo path: {value}")
+    if ref == "~" or (ref.startswith("~/") and not ref.startswith("~/.codex-context/")):
+        raise SystemExit(f"Only ~/.codex-context paths are allowed for home-relative distilledTo refs: {value}")
+    if ref == ".." or ref.startswith("../") or "/../" in ref:
+        raise SystemExit(f"Refusing parent-traversal distilledTo path: {value}")
+    return ref
+
+
+def unique_ordered(values: Iterable[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
+
+
 def parse_datetime_value(value: str) -> datetime | None:
     cleaned = value.strip().strip("'\"")
     if not cleaned:
@@ -1120,6 +1226,44 @@ def distill_session(args: argparse.Namespace) -> Result:
     return result
 
 
+def finalize_session_distillation(args: argparse.Namespace) -> Result:
+    session_path = expand(args.session)
+    result = Result()
+
+    if not session_path.exists():
+        raise SystemExit(f"Session note does not exist: {session_path}")
+    if args.status in {"distilled", "partial"} and not args.distilled_to:
+        raise SystemExit(f"--status {args.status} requires at least one --distilled-to value.")
+
+    text = session_path.read_text(encoding="utf-8", errors="replace")
+    header_lines, body = split_frontmatter_lines(text)
+    metadata = parse_simple_frontmatter(text)
+    if metadata.get("type") and metadata.get("type") != "session":
+        result.warn(f"source type is {metadata.get('type')}, expected session")
+
+    existing_refs = [validate_distilled_to_ref(value) for value in frontmatter_list_value(header_lines, "distilledTo")]
+    new_refs = [validate_distilled_to_ref(value) for value in args.distilled_to or []]
+    if args.status == "no-action":
+        distilled_refs: list[str] = []
+    else:
+        distilled_refs = unique_ordered([*existing_refs, *new_refs])
+
+    updated = now_iso()
+    updated_header = replace_frontmatter_scalar(header_lines, "distillationStatus", args.status)
+    updated_header = replace_frontmatter_list(updated_header, "distilledTo", distilled_refs)
+    updated_header = replace_frontmatter_scalar(updated_header, "updated", updated)
+    updated_text = "".join(updated_header) + body
+
+    result.add("source", str(session_path))
+    result.add("mode", "finalize session distillation metadata; body is not modified")
+    result.add("status", args.status)
+    result.add("distilledTo", ", ".join(distilled_refs) if distilled_refs else "[]")
+    result.add("update-frontmatter", str(session_path))
+    if args.write:
+        session_path.write_text(updated_text, encoding="utf-8")
+    return result
+
+
 def make_manifest(source: Path, dest: Path, imported: list[str], result: Result) -> str:
     imported_lines = "\n".join(f"- `{path}`" for path in imported) or "- None"
     warning_lines = "\n".join(f"- {warning}" for warning in result.warnings) or "- None"
@@ -1306,6 +1450,22 @@ def build_parser() -> argparse.ArgumentParser:
     distill.add_argument("--write", action="store_true")
     distill.add_argument("--log")
     distill.set_defaults(func=distill_session)
+
+    finalize = sub.add_parser(
+        "finalize-session-distillation",
+        help="update session note distillation metadata after review",
+    )
+    finalize.add_argument("--session", required=True, help="session note markdown path")
+    finalize.add_argument("--status", choices=["distilled", "partial", "no-action"], required=True)
+    finalize.add_argument(
+        "--distilled-to",
+        action="append",
+        help="accepted destination path or candidate path. Repeat to add multiple refs.",
+    )
+    finalize.add_argument("--dry-run", action="store_true")
+    finalize.add_argument("--write", action="store_true")
+    finalize.add_argument("--log")
+    finalize.set_defaults(func=finalize_session_distillation)
 
     register = sub.add_parser("register-project", help="register this repository in ~/.codex-context")
     register.add_argument("--target", default="~/.codex-context")

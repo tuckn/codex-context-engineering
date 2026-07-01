@@ -22,7 +22,7 @@
   "interface": {
     "displayName": "Tuckn Codex Context Engineering",
     "shortDescription": "Maintain and resume working context, project registry metadata, session notes, decisions, and global Codex context",
-    "longDescription": "A Codex plugin that groups context engineering skills and scripts for repository project registration, working context, session notes, session resume, session distillation candidates, decision records, decision review, local Codex session-log extraction, read-only global context loading, freshness audit, and explicit snapshot import or promotion through ~/.codex-context.",
+    "longDescription": "A Codex plugin that groups context engineering skills and scripts for repository project registration, working context, session notes, session resume, session distillation candidates and finalization, decision records, decision review, local Codex session-log extraction, read-only global context loading, freshness audit, and explicit snapshot import or promotion through ~/.codex-context.",
     "developerName": "Tuckn",
     "category": "Productivity",
     "capabilities": [
@@ -32,6 +32,7 @@
     "defaultPrompt": [
       "Resume an existing session note",
       "Distill a session note into reusable context candidates",
+      "Finalize a session note's distillation metadata after review",
       "Extract and summarize a topic from local Codex session logs",
       "Audit context freshness before relying on previous decisions",
       "Load selected global Codex context for this task",
