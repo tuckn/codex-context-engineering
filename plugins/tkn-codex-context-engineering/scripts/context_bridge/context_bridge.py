@@ -23,6 +23,23 @@ DEFAULT_LOAD_INCLUDE = "working-context,decisions,candidates,patterns,skill-cand
 DEFAULT_FRESHNESS_INCLUDE = (
     "working-context,project,decisions,sessions,candidates,patterns,skill-candidates,agents-candidates,reviews"
 )
+DISTILL_REUSABLE_SECTIONS = [
+    "important decisions",
+    "what worked",
+    "failed approaches",
+    "constraints",
+]
+DISTILL_FOLLOW_UP_SECTIONS = [
+    "open issues",
+    "next steps",
+    "exact next step",
+]
+DISTILL_EVIDENCE_SECTIONS = [
+    "user intent / interaction summary",
+    "working context",
+    "changed files",
+    "validation",
+]
 GLOBAL_CONTEXT_DIRS = [
     "decisions",
     "candidates",
@@ -437,6 +454,118 @@ Scope: `{scope}`
 - This audit is a freshness signal, not a correctness verdict.
 - Current user instructions, repository instructions, current files, and git state still take precedence.
 - Revalidate stale context against current evidence before promoting it to global context, AGENTS.md, or a Skill.
+"""
+
+
+def normalize_heading(value: str) -> str:
+    return re.sub(r"\s+", " ", value.strip().lower())
+
+
+def markdown_sections(text: str) -> dict[str, list[str]]:
+    sections: dict[str, list[str]] = {}
+    current = ""
+    for line in strip_frontmatter(text).splitlines():
+        match = re.match(r"^(#{2,6})\s+(.+?)\s*$", line)
+        if match:
+            current = normalize_heading(match.group(2))
+            sections.setdefault(current, [])
+            continue
+        if current:
+            sections[current].append(line.rstrip())
+    return sections
+
+
+def bounded_section_text(sections: dict[str, list[str]], name: str, max_lines: int) -> str:
+    lines = []
+    for line in sections.get(name, []):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        lines.append(stripped)
+        if len(lines) >= max_lines:
+            break
+    if not lines:
+        return "- None recorded."
+    return "\n".join(lines)
+
+
+def render_distill_section_group(
+    title: str,
+    section_names: list[str],
+    sections: dict[str, list[str]],
+    max_lines: int,
+) -> str:
+    blocks = [f"## {title}"]
+    for name in section_names:
+        blocks.append(f"### {name.title()}")
+        blocks.append(bounded_section_text(sections, name, max_lines))
+    return "\n\n".join(blocks)
+
+
+def render_session_distillation(
+    *,
+    session_path: Path,
+    metadata: dict[str, str],
+    sections: dict[str, list[str]],
+    args: argparse.Namespace,
+) -> str:
+    updated = now_iso()
+    title = args.title or metadata.get("title") or session_path.stem
+    source = source_ref(session_path)
+    repo = source_repo(args)
+    description = metadata.get("description", "")
+    source_updated = metadata.get("updated") or metadata.get("date") or ""
+    source_status = metadata.get("status", "")
+    source_distillation = metadata.get("distillationStatus", "")
+    candidate_title = f"Distilled session candidate: {title}"
+    metadata_block = frontmatter([
+        ("type", "sessionDistillationCandidate"),
+        ("title", candidate_title),
+        ("description", description),
+        ("generator", "Codex"),
+        ("status", "proposed"),
+        ("reviewStatus", "reviewing"),
+        ("distilledKind", args.kind),
+        ("sourceRefs", [source]),
+        ("sourceRepo", repo),
+        ("sourceSessionStatus", source_status),
+        ("sourceDistillationStatus", source_distillation),
+        ("date", updated),
+        ("updated", updated),
+        ("contextId", str(uuid.uuid4())),
+    ])
+    return f"""{metadata_block}
+
+# {candidate_title}
+
+## Summary
+
+- Source session: `{source}`
+- Source repo: `{repo}`
+- Proposed destination kind: `{args.kind}`
+- Source updated: {source_updated or "unknown"}
+- Source status: {source_status or "unknown"}
+- Source distillation status: {source_distillation or "unknown"}
+- Review required before promotion: yes
+
+## Usage Guidance
+
+- Treat this file as a review candidate, not accepted repository or global context.
+- Revalidate the extracted points against current user instructions, repository instructions, current files, and git state.
+- Promote only the reusable parts to working context, decisions, global context, AGENTS.md, or a Skill.
+- Do not promote raw chronological detail unless it prevents a repeated failure.
+
+{render_distill_section_group("Reusable Learnings", DISTILL_REUSABLE_SECTIONS, sections, args.max_section_lines)}
+
+{render_distill_section_group("Follow-Up Candidates", DISTILL_FOLLOW_UP_SECTIONS, sections, args.max_section_lines)}
+
+{render_distill_section_group("Evidence Snapshot", DISTILL_EVIDENCE_SECTIONS, sections, args.max_section_lines)}
+
+## Exclusions
+
+- Full chat transcript was not copied.
+- Full session note was not copied.
+- The source session note was not modified.
 """
 
 
@@ -957,6 +1086,40 @@ def audit_freshness(args: argparse.Namespace) -> Result:
     return result
 
 
+def distill_session(args: argparse.Namespace) -> Result:
+    session_path = expand(args.session)
+    dest = expand(args.dest)
+    result = Result()
+
+    if not session_path.exists():
+        raise SystemExit(f"Session note does not exist: {session_path}")
+    text = session_path.read_text(encoding="utf-8", errors="replace")
+    hits = has_secret_like_content(text)
+    if hits:
+        raise SystemExit(f"Sensitive-looking content detected in {session_path}; refusing to distill.")
+
+    metadata = parse_simple_frontmatter(text)
+    if metadata.get("type") and metadata.get("type") != "session":
+        result.warn(f"source type is {metadata.get('type')}, expected session")
+    sections = markdown_sections(text)
+    title = args.title or metadata.get("title") or session_path.stem
+    out_name = f"{now_compact()}-{slugify(title)}-distillation.md"
+    out_path = dest / out_name
+    content = render_session_distillation(
+        session_path=session_path,
+        metadata=metadata,
+        sections=sections,
+        args=args,
+    )
+
+    result.add("source", str(session_path))
+    result.add("mode", "candidate distillation; source session is not modified")
+    result.add("kind", args.kind)
+    result.add("sections", ", ".join(sorted(sections)) if sections else "(none)")
+    write_text(out_path, content, args.write, result, overwrite=True)
+    return result
+
+
 def make_manifest(source: Path, dest: Path, imported: list[str], result: Result) -> str:
     imported_lines = "\n".join(f"- `{path}`" for path in imported) or "- None"
     warning_lines = "\n".join(f"- {warning}" for warning in result.warnings) or "- None"
@@ -1127,6 +1290,22 @@ def build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--write", action="store_true")
     audit.add_argument("--log")
     audit.set_defaults(func=audit_freshness)
+
+    distill = sub.add_parser("distill-session", help="distill a session note into a review candidate")
+    distill.add_argument("--session", required=True, help="session note markdown path")
+    distill.add_argument("--dest", default=".local/codex-context/distilled-session-candidates")
+    distill.add_argument(
+        "--kind",
+        choices=["candidate", "decision-candidate", "working-context-update", "skill-candidate", "agents-candidate"],
+        default="candidate",
+    )
+    distill.add_argument("--title")
+    distill.add_argument("--source-repo", help="source repository name or label for destination metadata")
+    distill.add_argument("--max-section-lines", type=int, default=12)
+    distill.add_argument("--dry-run", action="store_true")
+    distill.add_argument("--write", action="store_true")
+    distill.add_argument("--log")
+    distill.set_defaults(func=distill_session)
 
     register = sub.add_parser("register-project", help="register this repository in ~/.codex-context")
     register.add_argument("--target", default="~/.codex-context")

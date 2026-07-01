@@ -98,6 +98,17 @@ python3 <plugin-root>/scripts/context_bridge/audit_context_freshness.py \
 Use `--write` to save a freshness review report under
 `.local/codex-context/freshness-reviews/`.
 
+Distill a session note into a review candidate:
+
+```bash
+python3 <plugin-root>/scripts/context_bridge/distill_session_context.py \
+  --session .codex-context/sessions/<session-note>.md \
+  --dry-run
+```
+
+Use `--write` to save a candidate under
+`.local/codex-context/distilled-session-candidates/`.
+
 Create a local snapshot of global context:
 
 ```bash
