@@ -80,15 +80,24 @@ python3 <plugin-root>/scripts/context_bridge/register_project_context.py \
 Use `--write` to create or update `.codex-context/project.yml` and
 `~/.codex-context/projects/index.jsonl`.
 
-Import global context into this repository:
+Load selected global context without writing files:
+
+```bash
+python3 <plugin-root>/scripts/context_bridge/load_global_context.py \
+  --source ~/.codex-context
+```
+
+Create a local snapshot of global context:
 
 ```bash
 python3 <plugin-root>/scripts/context_bridge/import_context.py \
   --source ~/.codex-context \
-  --dest .codex-context/global-context \
   --include working-context,decisions,candidates \
   --dry-run
 ```
+
+The snapshot default destination is `.local/codex-context/global-context/`. Use
+`--dest .codex-context/global-context` only when a repository snapshot is explicitly needed.
 
 Promote a candidate or decision to the global store:
 

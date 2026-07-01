@@ -1,69 +1,79 @@
 ---
 name: import-global-context
-description: user-global Codex context のうち選択した内容を ~/.codex-context から現在の repository の .codex-context/global-context へ import する。global Codex context を現在の repo に読み込み、load、import、apply する依頼で使う。
+description: Load selected user-global Codex context from `~/.codex-context` into the current task, preferably read-only, and create repository snapshots only when explicitly requested. Use when the user asks to load, import, apply, reference, or use global Codex context, other-chat context, or cross-repository Codex context.
 ---
 
 # Import Global Context
 
-ユーザーが user-global Codex context を現在の repository に読み込むよう依頼したときに、この skill を使う。
+Use this skill when the user asks to use user-global Codex context in the current repository.
 
-目的は、global context を自動 instruction に変えずに、chat と repository をまたいだ repository 作業を DRY にすることだ。
+Default to read-only load. Do not copy global context into the repository unless the user explicitly asks for an import, snapshot, or write.
 
-## Source and destination
+## Source
 
-Source:
+```text
+~/.codex-context
+```
 
-`~/.codex-context`
+This store is private historical context. It does not override current user instructions, system/developer instructions, repository `AGENTS.md`, current files, or git state.
 
-Destination:
+## Default Workflow
 
-`<repo>/.codex-context/global-context`
+1. Check repository instructions and `.codex-context/working-context.md` when relevant.
+2. Resolve this skill's plugin root and use `../../scripts/context_bridge/load_global_context.py`.
+3. Run read-only load to inspect relevant global context.
+4. Read only specific referenced files when the current task needs them.
+5. Compare loaded context against current repository state before using it.
+6. Record how loaded context was used in the session note when the task is non-trivial.
 
-import したファイルは historical reference として扱う。現在の user request、system/developer instructions、repository `AGENTS.md`、現在の file contents、git state を上書きしない。
+Read-only load:
 
-## When to use
+```bash
+python3 <plugin-root>/scripts/context_bridge/load_global_context.py \
+  --source ~/.codex-context
+```
 
-ユーザーが次のように依頼したときに、この skill を使う。
+Preview selected files:
 
-- "global contextを読み込んで"
-- "`~/.codex-context` をこのrepoに取り込んで"
-- "他チャットのCodex文脈を使って"
-- "import global context"
+```bash
+python3 <plugin-root>/scripts/context_bridge/load_global_context.py \
+  --source ~/.codex-context \
+  --decision DR-G-example.md \
+  --candidate example-candidate.md \
+  --pattern example-pattern.md
+```
 
-すべての task で自動的に使わない。Global context は意図的に import するものだ。
+The load command writes no files. It returns a short summary, category file lists, and short previews for explicitly selected files.
 
-## Workflow
+## Snapshot Import
 
-1. repository `AGENTS.md` と必須の repository specs の事前確認。
-2. `.codex-context/working-context.md` が存在し、関連する場合の確認。
-3. `~/.codex-context` の存在確認。
-4. 関連する global materials の判断。
-   - `working-context.md`
-   - accepted global decisions
-   - relevant candidates
-5. script の dry-run mode での実行。
-6. ユーザーが import または write を依頼している場合、`--write` 付きでの script 実行。
-7. 生成された import manifest の確認。
-8. 現在の repo state と比較したうえでの imported context の利用。
-9. 非自明な作業での、import した内容と利用方法の session note への記録。
+Use snapshot import only when the user explicitly asks to copy, write, import, or snapshot global context into the repository.
 
-## Script
+Default snapshot destination:
 
-この Plugin では bridge scripts は plugin root の `scripts/context_bridge/` に bundled されている。
-この `SKILL.md` からは `../../scripts/context_bridge/import_context.py` として解決できる。
+```text
+.local/codex-context/global-context/
+```
 
-実行時は、Codex がこの `SKILL.md` の location から plugin root を解決し、absolute path にして実行する。
-command 例:
+Dry-run:
 
 ```bash
 python3 <plugin-root>/scripts/context_bridge/import_context.py \
   --source ~/.codex-context \
-  --dest .codex-context/global-context \
   --include working-context,decisions,candidates \
   --dry-run
 ```
 
-Write mode:
+Write snapshot:
+
+```bash
+python3 <plugin-root>/scripts/context_bridge/import_context.py \
+  --source ~/.codex-context \
+  --include working-context,decisions,candidates \
+  --write
+```
+
+Repository `.codex-context/global-context/` snapshots are allowed only when explicitly requested:
 
 ```bash
 python3 <plugin-root>/scripts/context_bridge/import_context.py \
@@ -73,14 +83,12 @@ python3 <plugin-root>/scripts/context_bridge/import_context.py \
   --write
 ```
 
-global store が大きい場合は、`--decision <filename>` または `--candidate <filename>` で選択した file だけを import する。
+## Snapshot Contract
 
-## Import destination contract
-
-script が書き込む内容:
+The snapshot import command writes:
 
 ```text
-.codex-context/global-context/
+.local/codex-context/global-context/
   README.md
   working-context.md
   decisions/
@@ -89,18 +97,12 @@ script が書き込む内容:
     YYYYMMDDTHHMMSS+0900-import-manifest.md
 ```
 
-manifest に記録する内容:
-
-- source path
-- destination path
-- imported files
-- skipped files
-- warnings
-- timestamp
+Snapshots are historical references. Validate them against current repository state before using them.
 
 ## Safety
 
-- secrets、credentials、tokens、private keys、full env vars、large logs、不要な personal/customer data の import 禁止。
-- imported context 全体の盲目的な読み込み禁止。manifest と user request に関連する specific files の優先。
-- global source に sensitive に見える内容がある場合、停止して user への確認。
-- imported context が repository rules と矛盾する場合、repository rules の優先と session note への conflict 記録。
+- Do not blindly read all global context.
+- Do not write snapshots unless the user explicitly requested a write/import/snapshot.
+- Prefer `.local/` snapshots because `.local/` is ignored in this repository.
+- If using `.codex-context/global-context/`, treat it as historical reference and avoid committing private or stale context accidentally.
+- Stop if global context contains secrets, credentials, tokens, private keys, full env vars, large logs, or unnecessary personal/customer data.

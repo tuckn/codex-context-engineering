@@ -55,8 +55,8 @@ Included Skills:
 - `review-decisions`
 
 The plugin preserves and resumes Codex working context through repository project registration,
-working context, session notes, decision records, local Codex session-log extraction, and explicit
-import or promotion of user-global context through `~/.codex-context`.
+working context, session notes, decision records, local Codex session-log extraction, read-only
+global context loading, and explicit snapshot import or promotion through `~/.codex-context`.
 
 ## Adding Plugins
 

@@ -19,6 +19,7 @@ from typing import Iterable
 
 JST = timezone(timedelta(hours=9))
 DEFAULT_INCLUDE = "working-context,decisions,candidates"
+DEFAULT_LOAD_INCLUDE = "working-context,decisions,candidates,patterns,skill-candidates,agents-candidates"
 GLOBAL_CONTEXT_DIRS = [
     "decisions",
     "candidates",
@@ -138,6 +139,22 @@ def parse_include(value: str) -> set[str]:
     return parts or set(allowed)
 
 
+def parse_load_include(value: str) -> set[str]:
+    allowed = {
+        "working-context",
+        "decisions",
+        "candidates",
+        "patterns",
+        "skill-candidates",
+        "agents-candidates",
+    }
+    parts = {part.strip() for part in value.split(",") if part.strip()}
+    unknown = parts - allowed
+    if unknown:
+        raise SystemExit(f"Unknown include value(s): {', '.join(sorted(unknown))}")
+    return parts or set(allowed)
+
+
 def has_secret_like_content(text: str) -> list[str]:
     hits = []
     for pattern in SECRET_PATTERNS:
@@ -198,6 +215,49 @@ def list_selected_files(folder: Path, selected: Iterable[str] | None) -> list[Pa
     if not folder.exists():
         return []
     return sorted(path for path in folder.glob("*.md") if path.is_file())
+
+
+def ensure_md_name(value: str) -> str:
+    return value if value.endswith(".md") else f"{value}.md"
+
+
+def list_named_files(folder: Path, names: Iterable[str] | None) -> list[Path]:
+    if not names:
+        return []
+    return [folder / ensure_md_name(name) for name in names]
+
+
+def compact_preview(text: str, max_lines: int) -> str:
+    lines: list[str] = []
+    for raw_line in strip_frontmatter(text).splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("#") or len(lines) < max_lines:
+            lines.append(line)
+        if len(lines) >= max_lines:
+            break
+    return " | ".join(lines) if lines else "(no preview text)"
+
+
+def add_file_preview(path: Path, label: str, max_lines: int, result: Result) -> None:
+    if not path.exists():
+        result.warn(f"missing {label}: {path}")
+        return
+    text = path.read_text(encoding="utf-8", errors="replace")
+    hits = has_secret_like_content(text)
+    if hits:
+        raise SystemExit(f"Sensitive-looking content detected in {path}; refusing to preview.")
+    result.add(f"preview {label}", compact_preview(text, max_lines))
+
+
+def add_file_list(folder: Path, label: str, result: Result) -> None:
+    files = list_selected_files(folder, None)
+    if files:
+        names = ", ".join(path.name for path in files)
+    else:
+        names = "(none)"
+    result.add(f"list {label}", names)
 
 
 def git_value(repo_root: Path, *args: str) -> str:
@@ -447,8 +507,9 @@ This file is the lightweight dashboard for user-global Codex context.
 - Global Codex context is stored in `~/.codex-context`.
 - Generated context is kept separate from Codex configuration in `~/.codex`.
 - Project workspaces are tracked in `projects/index.jsonl` by stable workspace IDs.
-- Repositories may import selected global context into `.codex-context/global-context/`.
-- Imported global context is historical reference, not an override for repository rules or current user instructions.
+- Repositories should load selected global context read-only by default.
+- Repository snapshots should go under `.local/codex-context/global-context/` unless explicitly requested elsewhere.
+- Snapshot global context is historical reference, not an override for repository rules or current user instructions.
 
 ## Active Work
 
@@ -477,7 +538,7 @@ def repo_global_readme() -> str:
 
 This folder contains selected context imported from `~/.codex-context`.
 
-Imported context is historical reference. It does not override:
+Imported context is a historical snapshot reference. It does not override:
 
 - current user instructions
 - repository `AGENTS.md`
@@ -486,6 +547,8 @@ Imported context is historical reference. It does not override:
 - git state
 
 Use `imports/` manifests to see when and why context was imported.
+
+Prefer read-only load for routine work. Write snapshots only when explicitly requested.
 
 Created: {now_iso()}
 """
@@ -543,6 +606,42 @@ def import_context(args: argparse.Namespace) -> Result:
     return result
 
 
+def load_context(args: argparse.Namespace) -> Result:
+    source = expand(args.source)
+    include = parse_load_include(args.include)
+    result = Result()
+
+    if not source.exists():
+        raise SystemExit(f"Source does not exist: {source}")
+
+    result.add("source", str(source))
+    result.add("mode", "read-only load; no files are written")
+
+    if "working-context" in include:
+        path = source / "working-context.md"
+        if path.exists():
+            add_file_preview(path, "working-context", args.preview_lines, result)
+        else:
+            result.warn(f"missing working-context: {path}")
+
+    category_folders = [
+        ("decisions", "decisions", args.decision),
+        ("candidates", "candidates", args.candidate),
+        ("patterns", "patterns", args.pattern),
+        ("skill-candidates", "skill-candidates", args.skill_candidate),
+        ("agents-candidates", "agents-candidates", args.agents_candidate),
+    ]
+    for include_name, folder_name, selected in category_folders:
+        if include_name not in include:
+            continue
+        folder = source / folder_name
+        add_file_list(folder, folder_name, result)
+        for path in list_named_files(folder, selected):
+            add_file_preview(path, folder_name, args.preview_lines, result)
+
+    return result
+
+
 def make_manifest(source: Path, dest: Path, imported: list[str], result: Result) -> str:
     imported_lines = "\n".join(f"- `{path}`" for path in imported) or "- None"
     warning_lines = "\n".join(f"- {warning}" for warning in result.warnings) or "- None"
@@ -568,7 +667,9 @@ Date: {now_iso()}
 
 ## Notes
 
-Imported context is historical reference and must be validated against current repository state before use.
+This snapshot is historical reference only. Repository instructions, current user instructions,
+current files, and git state take precedence. Validate imported context against current repository
+state before use.
 """
 
 
@@ -671,7 +772,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     read = sub.add_parser("import", help="import global context into a repository")
     read.add_argument("--source", default="~/.codex-context")
-    read.add_argument("--dest", default=".codex-context/global-context")
+    read.add_argument("--dest", default=".local/codex-context/global-context")
     read.add_argument("--include", default=DEFAULT_INCLUDE)
     read.add_argument("--decision", action="append", help="specific decision markdown filename to import")
     read.add_argument("--candidate", action="append", help="specific candidate markdown filename to import")
@@ -679,6 +780,17 @@ def build_parser() -> argparse.ArgumentParser:
     read.add_argument("--write", action="store_true")
     read.add_argument("--log")
     read.set_defaults(func=import_context)
+
+    load = sub.add_parser("load", help="read selected global context without writing files")
+    load.add_argument("--source", default="~/.codex-context")
+    load.add_argument("--include", default=DEFAULT_LOAD_INCLUDE)
+    load.add_argument("--decision", action="append", help="specific decision markdown filename to preview")
+    load.add_argument("--candidate", action="append", help="specific candidate markdown filename to preview")
+    load.add_argument("--pattern", action="append", help="specific pattern markdown filename to preview")
+    load.add_argument("--skill-candidate", action="append", help="specific skill-candidate markdown filename to preview")
+    load.add_argument("--agents-candidate", action="append", help="specific agents-candidate markdown filename to preview")
+    load.add_argument("--preview-lines", type=int, default=8)
+    load.set_defaults(func=load_context, write=False)
 
     register = sub.add_parser("register-project", help="register this repository in ~/.codex-context")
     register.add_argument("--target", default="~/.codex-context")
