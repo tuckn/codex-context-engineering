@@ -1,0 +1,92 @@
+# Tuckn Codex Context Engineering
+
+[English](README.md) | 日本語
+
+この plugin は、Codex が前回の作業の続きを理解しやすくするためのものです。リポジトリ
+の状況、進行中の作業、重要な判断を軽量なメモとして残し、次の chat で同じ背景説明を
+繰り返さずに再開できるようにします。
+
+明示的に依頼した場合は、過去の Codex の会話ログから役立つ内容を探したり、
+`~/.codex-context` に置いた private な共通メモを読み込んだりできます。
+
+## Plugin の構成
+
+Plugin path:
+
+```text
+plugins/tkn-codex-context-engineering/
+```
+
+Plugin manifest:
+
+```text
+plugins/tkn-codex-context-engineering/.codex-plugin/plugin.json
+```
+
+Bundled Skills:
+
+```text
+plugins/tkn-codex-context-engineering/skills/
+```
+
+Context bridge scripts:
+
+```text
+plugins/tkn-codex-context-engineering/scripts/context_bridge/
+```
+
+## 含まれる Skills
+
+含まれる Skills は、context lifecycle 上の役割ごとに分類しています。
+
+### プロジェクト登録と現在の状況維持
+
+- `register-project-context`: repository の Codex project identity を登録または更新し、
+  user-global project registry と接続します。
+- `maintain-working-context`: `.codex-context/working-context.md` を active repository
+  context の lightweight dashboard として保守します。
+
+### 作業記録と再開
+
+- `maintain-session-note`: 非自明な作業、handoff、resumable task のために
+  `.codex-context/sessions` の簡潔な note を作成または更新します。
+- `resume-session`: 新しい session record を重複作成せず、既存の session note を新しい chat
+  で継続します。
+
+### 長く残す判断と見直し
+
+- `record-decision`: 現在の chat を超えて残すべき判断を `.codex-context/decisions` 配下の
+  durable decision record として記録します。
+- `review-decisions`: decision records を review し、repository document updates、
+  working-context changes、global-context promotion candidates を洗い出します。
+
+### 過去 session の復元と要約
+
+- `extract-codex-sessions`: local Codex JSONL session logs から、themes、questions、
+  decisions、outcomes、project history を抽出します。
+- `distill-session-context`: session note を短い reusable-context review candidate に
+  distill し、review 後に distillation metadata を finalize します。
+
+### Global context の読み込みと昇格
+
+- `import-global-context`: 選択した user-global Codex context を現在の task に読み込みます。
+  既定では read-only で扱い、snapshot 作成は明示依頼時だけ行います。
+- `promote-global-context`: repo-local context から再利用可能な学びを抽出し、private な
+  user-global context store に promote します。
+
+### Context の鮮度管理と思考メモの整理
+
+- `audit-context-freshness`: repo-local または global context の stale metadata、pending
+  distillation / promotion、再利用リスクを監査します。
+- `organize-brain-dump`: rough notes、idea dump、相談メモを整理し、`_inbox/ai/` 配下の
+  structured Markdown advice に変換します。
+
+## Local context と Global context
+
+この plugin は、repo-local context を project の source of truth、user-global context を private
+な reuse layer として扱います。
+
+- Repo-local context は対象 repository の `.codex-context/` に置きます。
+- User-global context は `~/.codex-context` に置きます。
+- Global context の読み込みは、既定では read-only にします。
+- Snapshot import や global promotion は、明示的に依頼された場合だけ行います。

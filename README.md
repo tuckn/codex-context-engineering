@@ -1,5 +1,7 @@
 # tkn-codex-plugins
 
+[English](README.md) | [日本語](README_ja.md)
+
 Tuckn's public Codex plugin marketplace.
 
 ## Install
@@ -27,7 +29,11 @@ repositories and publish completed bundles into `plugins/<plugin-name>/`.
 
 ## Plugins
 
-### TKN Codex Context Engineering
+### Tuckn Codex Context Engineering
+
+This plugin helps Codex pick up project work where it left off. It keeps lightweight notes about
+the repository, active work, and important decisions so a later chat can resume without repeating
+the same background.
 
 Path:
 
@@ -35,31 +41,10 @@ Path:
 plugins/tkn-codex-context-engineering/
 ```
 
-Plugin manifest:
+Details:
 
-```text
-plugins/tkn-codex-context-engineering/.codex-plugin/plugin.json
-```
-
-Included Skills:
-
-- `audit-context-freshness`
-- `distill-session-context`
-- `extract-codex-sessions`
-- `import-global-context`
-- `maintain-session-note`
-- `maintain-working-context`
-- `organize-brain-dump`
-- `promote-global-context`
-- `register-project-context`
-- `record-decision`
-- `resume-session`
-- `review-decisions`
-
-The plugin preserves and resumes Codex working context through repository project registration,
-working context, session notes, decision records, local Codex session-log extraction, read-only
-global context loading, freshness audit, session distillation candidates and finalization, and
-explicit snapshot import or promotion through `~/.codex-context`.
+- [Plugin README](plugins/tkn-codex-context-engineering/README.md)
+- [日本語 README](plugins/tkn-codex-context-engineering/README_ja.md)
 
 ## Adding Plugins
 
